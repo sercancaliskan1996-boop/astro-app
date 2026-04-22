@@ -1,4 +1,2 @@
 streamlit
 geopy
-sqlite3
-hashlib
