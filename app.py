@@ -1,21 +1,14 @@
 import streamlit as st
-from skyfield.api import load
-from skyfield.framelib import ecliptic_frame
+import swisseph as swe
 from datetime import datetime
+from geopy.geocoders import Nominatim
 
-st.set_page_config(page_title="Astro Pro Max", layout="centered")
+st.set_page_config(page_title="Ultimate Astro", layout="centered")
 
 # =========================
-# LOAD DATA (CACHE)
+# SWISS EPHEMERIS
 # =========================
-@st.cache_resource
-def load_data():
-    eph = load('de421.bsp')
-    ts = load.timescale()
-    return eph, ts
-
-eph, ts = load_data()
-earth = eph['earth']
+swe.set_ephe_path('.')
 
 # =========================
 # ZODIAC
@@ -23,159 +16,144 @@ earth = eph['earth']
 def zodiac(lon):
     signs = ["Koç","Boğa","İkizler","Yengeç","Aslan","Başak",
              "Terazi","Akrep","Yay","Oğlak","Kova","Balık"]
-    return signs[int((lon % 360) / 30)]
+    return signs[int(lon/30)]
 
 # =========================
-# PLANETS (GERÇEK)
+# GEO
 # =========================
-def get_positions(year, month, day, hour):
-    t = ts.utc(year, month, day, hour)
+def get_coords(city):
+    try:
+        geo = Nominatim(user_agent="astro")
+        loc = geo.geocode(city, timeout=10)
+        if loc:
+            return loc.latitude, loc.longitude
+    except:
+        pass
+    return 41.0082, 28.9784
 
-    bodies = {
-        "Güneş": eph['sun'],
-        "Ay": eph['moon'],
-        "Merkür": eph['mercury'],
-        "Venüs": eph['venus'],
-        "Mars": eph['mars'],
-        "Jüpiter": eph['jupiter barycenter'],
-        "Satürn": eph['saturn barycenter']
+# =========================
+# PLANETS (REAL)
+# =========================
+def get_chart(y, m, d, hour, lat, lon):
+
+    jd = swe.julday(y, m, d, hour)
+
+    planets = {
+        "Güneş": swe.SUN,
+        "Ay": swe.MOON,
+        "Merkür": swe.MERCURY,
+        "Venüs": swe.VENUS,
+        "Mars": swe.MARS,
+        "Jüpiter": swe.JUPITER,
+        "Satürn": swe.SATURN
     }
 
-    result = {}
+    results = {}
     longitudes = {}
 
-    for name, body in bodies.items():
-        astrometric = earth.at(t).observe(body)
+    for name, p in planets.items():
+        lon_val = swe.calc_ut(jd, p)[0][0]
+        results[name] = zodiac(lon_val)
+        longitudes[name] = lon_val
 
-        lat, lon, distance = astrometric.frame_latlon(ecliptic_frame)
+    # ASC + Houses (GERÇEK)
+    houses = swe.houses(jd, lat, lon)
 
-        lon_deg = lon.degrees
-        result[name] = zodiac(lon_deg)
-        longitudes[name] = lon_deg
+    asc = zodiac(houses[0][0])
 
-    return result, longitudes
-
-# =========================
-# ASC (YAKLAŞIM)
-# =========================
-def ascendant(hour, lon):
-    asc_lon = (hour * 15 + lon) % 360
-    return zodiac(asc_lon)
+    return results, longitudes, asc
 
 # =========================
-# EVLER
+# ASPECTS
 # =========================
-def houses(asc_sign):
-    signs = ["Koç","Boğa","İkizler","Yengeç","Aslan","Başak",
-             "Terazi","Akrep","Yay","Oğlak","Kova","Balık"]
+def aspects(longitudes):
+    res = []
+    keys = list(longitudes.keys())
 
-    index = signs.index(asc_sign)
+    for i in range(len(keys)):
+        for j in range(i+1, len(keys)):
 
-    return {f"{i+1}. Ev": signs[(index+i)%12] for i in range(12)}
-
-# =========================
-# AÇILAR (ASPECTS)
-# =========================
-def calculate_aspects(longitudes):
-    aspects = []
-    names = list(longitudes.keys())
-
-    for i in range(len(names)):
-        for j in range(i+1, len(names)):
-
-            p1 = names[i]
-            p2 = names[j]
+            p1 = keys[i]
+            p2 = keys[j]
 
             diff = abs(longitudes[p1] - longitudes[p2])
             diff = min(diff, 360 - diff)
 
             if abs(diff - 0) < 8:
-                aspects.append(f"{p1} ☌ {p2} (Kavuşum)")
-            elif abs(diff - 60) < 6:
-                aspects.append(f"{p1} ⚹ {p2} (Sextile)")
+                res.append(f"{p1} ☌ {p2}")
             elif abs(diff - 90) < 6:
-                aspects.append(f"{p1} □ {p2} (Kare)")
+                res.append(f"{p1} □ {p2}")
             elif abs(diff - 120) < 6:
-                aspects.append(f"{p1} △ {p2} (Üçgen)")
+                res.append(f"{p1} △ {p2}")
             elif abs(diff - 180) < 8:
-                aspects.append(f"{p1} ☍ {p2} (Karşıt)")
+                res.append(f"{p1} ☍ {p2}")
 
-    return aspects
+    return res
 
 # =========================
-# AI YORUM
+# AI COMMENT
 # =========================
-def ai_comment(planets, asc, aspects):
+def ai(planets, asc):
     return f"""
-☀ Güneş {planets['Güneş']} → karakterin.
+☀ {planets['Güneş']} → temel karakter
 
-🌙 Ay {planets['Ay']} → duyguların.
+🌙 {planets['Ay']} → duygular
 
-🌅 Yükselen {asc} → dış dünyaya yansıman.
+🌅 {asc} → dış görünüm
 
-💖 Venüs {planets['Venüs']} → aşk tarzın.
+💖 {planets['Venüs']} → aşk
 
-🔥 Mars {planets['Mars']} → motivasyonun.
+🔥 {planets['Mars']} → enerji
 
-🔺 Açılar:
-{', '.join(aspects[:5]) if aspects else 'Belirgin açı yok'}
-
-Genel olarak güçlü bir dönüşüm sürecindesin.
+Hayatında önemli bir dönüşüm sürecindesin.
 """
 
 # =========================
 # UI
 # =========================
-st.title("🔮 Astro Pro Max")
+st.title("🔮 Ultimate Astro Engine (Gerçek)")
 
-col1, col2, col3 = st.columns(3)
+col1,col2,col3 = st.columns(3)
 
 with col1:
-    day = st.number_input("Gün", 1, 31)
-
+    day = st.number_input("Gün",1,31)
 with col2:
-    month = st.number_input("Ay", 1, 12)
-
+    month = st.number_input("Ay",1,12)
 with col3:
-    year = st.number_input("Yıl", 1900, 2026)
+    year = st.number_input("Yıl",1900,2026)
 
-hour = st.number_input("Saat", 0, 23)
+hour = st.number_input("Saat",0,23)
+minute = st.number_input("Dakika",0,59)
 
-# stabil için sabit longitude (İstanbul)
-lon = 28.9784
+city = st.text_input("Şehir", "Istanbul")
 
-# =========================
-# RUN
-# =========================
-if st.button("✨ Doğum Haritası Oluştur"):
+if st.button("✨ Hesapla"):
 
     try:
         datetime(year, month, day)
 
-        planets_data, longitudes = get_positions(year, month, day, hour)
+        hour_decimal = hour + minute/60
 
-        asc = ascendant(hour, lon)
-        house_data = houses(asc)
-        aspects = calculate_aspects(longitudes)
+        lat, lon = get_coords(city)
+
+        planets, longitudes, asc = get_chart(
+            year, month, day, hour_decimal, lat, lon
+        )
 
         st.subheader("🪐 Gezegenler")
-        for k, v in planets_data.items():
+        for k,v in planets.items():
             st.write(f"{k}: {v}")
 
         st.subheader("🌅 Yükselen")
         st.write(asc)
 
-        st.subheader("🏠 Evler")
-        for k, v in house_data.items():
-            st.write(f"{k}: {v}")
-
         st.subheader("🔺 Açılar")
-        for a in aspects:
+        for a in aspects(longitudes):
             st.write(a)
 
-        st.subheader("🧠 AI Analiz")
-        st.write(ai_comment(planets_data, asc, aspects))
+        st.subheader("🧠 Yorum")
+        st.write(ai(planets, asc))
 
     except Exception as e:
-        st.error("Hata oluştu")
+        st.error("Hata")
         st.write(e)
