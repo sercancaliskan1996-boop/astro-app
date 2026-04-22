@@ -12,5 +12,5 @@ Bu proje bir doğum haritası ve astroloji analiz uygulamasıdır.
 ## ▶️ Çalıştırma
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt pip install skyfield streamlit
 streamlit run app.py
