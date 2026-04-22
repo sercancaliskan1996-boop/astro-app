@@ -35,13 +35,13 @@ def ai_yorum(data):
     moon = data.get("moon", "bilinmiyor")
 
     return f"""
-☀ Güneş {sun} konumunda: güçlü karakter ve yön belirleme.
+☀ Güneş: {sun}
 
-🌙 Ay {moon} konumunda: duygusal dalgalanmalar ve sezgi yüksek.
+🌙 Ay: {moon}
 
-❤️ Aşk: yoğun duygular ve bağ kurma isteği artıyor.
+❤️ Aşk: Duygusal bağlar güçleniyor.
 
-💼 Kariyer: fırsatlar var ama sabırlı olmalısın.
+💼 Kariyer: Sabırlı olursan fırsatlar geliyor.
 """
 
 # =========================
@@ -65,12 +65,16 @@ with col4:
 with col5:
     minute = st.number_input("Dakika",0,59)
 
-city = st.text_input("Şehir (Istanbul önerilir)")
+city = st.text_input("Şehir (Istanbul yaz)", value="Istanbul")
 
 # =========================
 # BUTTON
 # =========================
 if st.button("✨ Analiz Et"):
+
+    if not city:
+        st.error("Şehir girmen gerekiyor")
+        st.stop()
 
     url = "https://api.api-ninjas.com/v1/astrology"
 
@@ -87,17 +91,25 @@ if st.button("✨ Analiz Et"):
         "city": city
     }
 
-    response = requests.get(url, headers=headers, params=params)
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=10)
 
-    if response.status_code == 200:
+        st.write("Status:", response.status_code)  # DEBUG
 
-        data = response.json()
+        if response.status_code == 200:
 
-        st.markdown('<div class="card">🪐 Gezegenler</div>', unsafe_allow_html=True)
-        st.json(data)
+            data = response.json()
 
-        st.markdown('<div class="card">🧠 AI Yorum</div>', unsafe_allow_html=True)
-        st.write(ai_yorum(data))
+            st.markdown('<div class="card">🪐 Gezegenler</div>', unsafe_allow_html=True)
+            st.json(data)
 
-    else:
-        st.error("API hatası - şehir veya key yanlış olabilir")
+            st.markdown('<div class="card">🧠 AI Yorum</div>', unsafe_allow_html=True)
+            st.write(ai_yorum(data))
+
+        else:
+            st.error("API hata verdi")
+            st.write(response.text)
+
+    except Exception as e:
+        st.error("Bağlantı hatası")
+        st.write(e)
