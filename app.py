@@ -1,9 +1,14 @@
 import streamlit as st
 import sqlite3
 import hashlib
-from datetime import datetime, date
+from datetime import date
 from geopy.geocoders import Nominatim
 import math
+
+# =========================
+# CONFIG
+# =========================
+st.set_page_config(page_title="Astro App", layout="centered")
 
 # =========================
 # DATABASE
@@ -48,130 +53,118 @@ def login(username, password):
 # GEO
 # =========================
 def get_coordinates(city):
-    geolocator = Nominatim(user_agent="astro_app")
-    loc = geolocator.geocode(city)
-    if loc:
-        return loc.latitude, loc.longitude
+    try:
+        geolocator = Nominatim(user_agent="astro_app")
+        loc = geolocator.geocode(city)
+        if loc:
+            return loc.latitude, loc.longitude
+    except:
+        pass
     return None, None
 
 # =========================
-# UTIL
+# UTILS
 # =========================
 def day_of_year(d, m, y):
     return (date(y, m, d) - date(y, 1, 1)).days + 1
 
-# =========================
-# ZODIAC
-# =========================
 def zodiac_sign(lon):
     signs = [
         "Koç","Boğa","İkizler","Yengeç","Aslan","Başak",
         "Terazi","Akrep","Yay","Oğlak","Kova","Balık"
     ]
-    index = int((lon % 360) / 30)
-    return signs[index]
+    return signs[int((lon % 360) / 30)]
 
 # =========================
-# PRODUCTION ASTRO ENGINE (NO EPHEM)
+# ASTRO ENGINE
 # =========================
 def get_planets(day, month, year):
     doy = day_of_year(day, month, year)
 
-    # --- simplified astronomical cycles ---
+    sun = (doy / 365.25) * 360
+    moon = (doy % 29.53) / 29.53 * 360
+    mercury = (doy % 88) / 88 * 360
+    venus = (doy % 225) / 225 * 360
+    mars = (doy % 687) / 687 * 360
+    jupiter = (doy % 4332) / 4332 * 360
+    saturn = (doy % 10759) / 10759 * 360
 
-    # Sun (year cycle)
-    sun_lon = (doy / 365.25) * 360
-
-    # Moon (29.53 day cycle)
-    moon_lon = (doy % 29.53) / 29.53 * 360
-
-    # Mercury (88 days)
-    mercury_lon = (doy % 88) / 88 * 360
-
-    # Venus (225 days)
-    venus_lon = (doy % 225) / 225 * 360
-
-    # Mars (687 days)
-    mars_lon = (doy % 687) / 687 * 360
-
-    # Jupiter (11.8 years approx)
-    jupiter_lon = (doy % 4332) / 4332 * 360
-
-    # Saturn (29.4 years approx)
-    saturn_lon = (doy % 10759) / 10759 * 360
+    asc = (sun + moon) % 360
 
     return {
-        "Sun": zodiac_sign(sun_lon),
-        "Moon": zodiac_sign(moon_lon),
-        "Mercury": zodiac_sign(mercury_lon),
-        "Venus": zodiac_sign(venus_lon),
-        "Mars": zodiac_sign(mars_lon),
-        "Jupiter": zodiac_sign(jupiter_lon),
-        "Saturn": zodiac_sign(saturn_lon),
-        "Ascendant": zodiac_sign((sun_lon + moon_lon) % 360)
+        "Güneş": zodiac_sign(sun),
+        "Ay": zodiac_sign(moon),
+        "Merkür": zodiac_sign(mercury),
+        "Venüs": zodiac_sign(venus),
+        "Mars": zodiac_sign(mars),
+        "Jüpiter": zodiac_sign(jupiter),
+        "Satürn": zodiac_sign(saturn),
+        "Yükselen": zodiac_sign(asc)
     }
 
 # =========================
-# DAILY HOROSCOPE
+# COMMENTS
 # =========================
-def daily_horoscope(planets):
+def daily_comment(planets):
     return f"""
-☀ Güneş: {planets['Sun']}
-🌙 Ay: {planets['Moon']}
-☿ Merkür: {planets['Mercury']}
-♀ Venüs: {planets['Venus']}
-♂ Mars: {planets['Mars']}
-♃ Jüpiter: {planets['Jupiter']}
-♄ Satürn: {planets['Saturn']}
-🌅 Yükselen: {planets['Ascendant']}
+☀ Güneş: {planets['Güneş']}
+🌙 Ay: {planets['Ay']}
+🌅 Yükselen: {planets['Yükselen']}
 
-🔮 Bugün enerjin Güneş ve Ay kombinasyonuna göre şekilleniyor.
-İletişim (Merkür) ve ilişkiler (Venüs) önemli.
+Bugün enerjin Güneş ve Ay kombinasyonuna göre şekilleniyor.
+İlişkilerde (Venüs) ve iletişimde (Merkür) dikkatli ol.
+Yeni fırsatlar kapıda olabilir.
 """
 
-# =========================
-# AI COMMENT (SIMPLIFIED)
-# =========================
 def ai_comment(planets):
     return f"""
-☀ {planets['Sun']} burcu güçlü bir karakter yapısı gösterir.
-🌙 {planets['Moon']} duygusal derinlik verir.
-♀ {planets['Venus']} aşk enerjini belirler.
+✨ {planets['Güneş']} burcu güçlü bir karakter verir.
+🌙 {planets['Ay']} duygusal dünyanı etkiler.
+💖 {planets['Venüs']} aşk hayatını belirler.
 
-Genel olarak dönüşüm ve farkındalık sürecindesin.
+Genel olarak değişim ve farkındalık sürecindesin.
 """
 
 # =========================
-# UI
+# SESSION STATE FIX
 # =========================
-st.title("🔮 Astro Pro V6 - Production Engine (No External Astro Lib)")
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-menu = st.sidebar.selectbox("Menü", ["Kayıt","Giriş","Uygulama"])
+if "show_result" not in st.session_state:
+    st.session_state.show_result = False
+
+# =========================
+# MENU
+# =========================
+menu = st.sidebar.selectbox("Menü", ["Kayıt", "Giriş", "Uygulama"])
 
 # =========================
 # REGISTER
 # =========================
 if menu == "Kayıt":
-    u = st.text_input("Kullanıcı")
+    st.subheader("Kayıt Ol")
+    u = st.text_input("Kullanıcı adı")
     p = st.text_input("Şifre", type="password")
 
-    if st.button("Kayıt Ol"):
-        if register(u,p):
+    if st.button("Kayıt"):
+        if register(u, p):
             st.success("Kayıt başarılı")
         else:
-            st.error("Hata")
+            st.error("Kullanıcı zaten var")
 
 # =========================
 # LOGIN
 # =========================
 elif menu == "Giriş":
-    u = st.text_input("Kullanıcı")
+    st.subheader("Giriş Yap")
+    u = st.text_input("Kullanıcı adı")
     p = st.text_input("Şifre", type="password")
 
     if st.button("Giriş"):
-        user = login(u,p)
+        user = login(u, p)
         if user:
-            st.session_state['user'] = user
+            st.session_state.logged_in = True
             st.success("Giriş başarılı")
         else:
             st.error("Hatalı giriş")
@@ -181,45 +174,41 @@ elif menu == "Giriş":
 # =========================
 elif menu == "Uygulama":
 
-    if "user" not in st.session_state:
+    if not st.session_state.logged_in:
         st.warning("Önce giriş yap")
     else:
-        user = st.session_state['user']
+        st.subheader("Doğum Haritası")
 
-        st.subheader(f"Hoş geldin {user[1]}")
-
-        col1,col2,col3 = st.columns(3)
+        col1, col2, col3 = st.columns(3)
 
         with col1:
-            day = st.number_input("Gün",1,31)
+            day = st.number_input("Gün", 1, 31)
         with col2:
-            month = st.number_input("Ay",1,12)
+            month = st.number_input("Ay", 1, 12)
         with col3:
-            year = st.number_input("Yıl",1900,2026)
+            year = st.number_input("Yıl", 1900, 2026)
 
         city = st.text_input("Doğum Şehri")
 
-        if st.button("Doğum Haritası Oluştur"):
+        if st.button("Harita Oluştur"):
+            st.session_state.show_result = True
+
+        # ✅ STABİL SONUÇ BLOĞU
+        if st.session_state.show_result:
 
             lat, lon = get_coordinates(city)
 
             if not lat:
                 st.error("Şehir bulunamadı")
             else:
-
                 planets = get_planets(day, month, year)
 
                 st.subheader("🪐 Gezegenler")
-                for k,v in planets.items():
+                for k, v in planets.items():
                     st.write(f"{k}: {v}")
 
                 st.subheader("📅 Günlük Yorum")
-                st.write(daily_horoscope(planets))
+                st.write(daily_comment(planets))
 
                 st.subheader("🧠 AI Yorum")
                 st.write(ai_comment(planets))
-
-                if user[3] == 0:
-                    st.warning("Premium: gelişmiş transit + açı sistemi kilitli")
-                else:
-                    st.success("Premium aktif - V7 (aspect engine) hazır olacak")
