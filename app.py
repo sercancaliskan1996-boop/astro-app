@@ -1,7 +1,7 @@
 import streamlit as st
-from skyfield.api import load, ECLIPJ2000
+from skyfield.api import load
+from skyfield.framelib import ecliptic_frame
 from datetime import datetime
-import math
 
 st.set_page_config(page_title="Astro Pro Max", layout="centered")
 
@@ -26,10 +26,9 @@ def zodiac(lon):
     return signs[int((lon % 360) / 30)]
 
 # =========================
-# PLANET POSITIONS (REAL)
+# PLANETS (GERÇEK)
 # =========================
 def get_positions(year, month, day, hour):
-
     t = ts.utc(year, month, day, hour)
 
     bodies = {
@@ -48,7 +47,7 @@ def get_positions(year, month, day, hour):
     for name, body in bodies.items():
         astrometric = earth.at(t).observe(body)
 
-        lat, lon, distance = astrometric.frame_latlon(ECLIPJ2000)
+        lat, lon, distance = astrometric.frame_latlon(ecliptic_frame)
 
         lon_deg = lon.degrees
         result[name] = zodiac(lon_deg)
@@ -57,15 +56,14 @@ def get_positions(year, month, day, hour):
     return result, longitudes
 
 # =========================
-# ASC (IMPROVED)
+# ASC (YAKLAŞIM)
 # =========================
 def ascendant(hour, lon):
-    # basit sidereal yaklaşım
     asc_lon = (hour * 15 + lon) % 360
     return zodiac(asc_lon)
 
 # =========================
-# HOUSES
+# EVLER
 # =========================
 def houses(asc_sign):
     signs = ["Koç","Boğa","İkizler","Yengeç","Aslan","Başak",
@@ -76,7 +74,7 @@ def houses(asc_sign):
     return {f"{i+1}. Ev": signs[(index+i)%12] for i in range(12)}
 
 # =========================
-# ASPECTS
+# AÇILAR (ASPECTS)
 # =========================
 def calculate_aspects(longitudes):
     aspects = []
@@ -109,9 +107,9 @@ def calculate_aspects(longitudes):
 # =========================
 def ai_comment(planets, asc, aspects):
     return f"""
-☀ Güneş {planets['Güneş']} → kimliğini belirler.
+☀ Güneş {planets['Güneş']} → karakterin.
 
-🌙 Ay {planets['Ay']} → duygusal tepkilerin.
+🌙 Ay {planets['Ay']} → duyguların.
 
 🌅 Yükselen {asc} → dış dünyaya yansıman.
 
@@ -122,13 +120,13 @@ def ai_comment(planets, asc, aspects):
 🔺 Açılar:
 {', '.join(aspects[:5]) if aspects else 'Belirgin açı yok'}
 
-Genel olarak güçlü bir içsel dönüşüm ve farkındalık dönemindesin.
+Genel olarak güçlü bir dönüşüm sürecindesin.
 """
 
 # =========================
 # UI
 # =========================
-st.title("🔮 Astro Pro Max (Full Engine)")
+st.title("🔮 Astro Pro Max")
 
 col1, col2, col3 = st.columns(3)
 
@@ -143,7 +141,7 @@ with col3:
 
 hour = st.number_input("Saat", 0, 23)
 
-# sabit İstanbul (stabil)
+# stabil için sabit longitude (İstanbul)
 lon = 28.9784
 
 # =========================
