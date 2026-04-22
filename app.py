@@ -13,7 +13,7 @@ if st.button("Hesapla"):
     url = "https://api.api-ninjas.com/v1/astrology"
     
     headers = {
-        "X-Api-Key": "BURAYA_API_KEY_YAZ"
+        "X-Api-Key": "rPj8lg7danUhC74RSavTw2H73peVXx0oT1amRnGq"
     }
 
     params = {
