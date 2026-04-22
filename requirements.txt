@@ -1,2 +1,1 @@
-streamlit
-requests
+pip install skyfield streamlit
