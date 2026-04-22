@@ -2,7 +2,6 @@ import streamlit as st
 import sqlite3
 import hashlib
 from datetime import date
-from geopy.geocoders import Nominatim
 import math
 
 # =========================
@@ -50,17 +49,19 @@ def login(username, password):
     return c.fetchone()
 
 # =========================
-# GEO
+# OFFLINE CITY DATABASE
 # =========================
+cities = {
+    "Istanbul": (41.0082, 28.9784),
+    "Ankara": (39.9334, 32.8597),
+    "Izmir": (38.4237, 27.1428),
+    "Bursa": (40.1885, 29.0610),
+    "Antalya": (36.8969, 30.7133),
+    "Adana": (37.0000, 35.3213)
+}
+
 def get_coordinates(city):
-    try:
-        geolocator = Nominatim(user_agent="astro_app")
-        loc = geolocator.geocode(city)
-        if loc:
-            return loc.latitude, loc.longitude
-    except:
-        pass
-    return None, None
+    return cities.get(city, (41.0082, 28.9784))  # default Istanbul
 
 # =========================
 # UTILS
@@ -126,7 +127,7 @@ Genel olarak değişim ve farkındalık sürecindesin.
 """
 
 # =========================
-# SESSION STATE FIX
+# SESSION STATE
 # =========================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -188,27 +189,21 @@ elif menu == "Uygulama":
         with col3:
             year = st.number_input("Yıl", 1900, 2026)
 
-        city = st.text_input("Doğum Şehri")
+        city = st.selectbox("Doğum Şehri", list(cities.keys()))
 
         if st.button("Harita Oluştur"):
             st.session_state.show_result = True
 
-        # ✅ STABİL SONUÇ BLOĞU
         if st.session_state.show_result:
 
-            lat, lon = get_coordinates(city)
+            planets = get_planets(day, month, year)
 
-            if not lat:
-                st.error("Şehir bulunamadı")
-            else:
-                planets = get_planets(day, month, year)
+            st.subheader("🪐 Gezegenler")
+            for k, v in planets.items():
+                st.write(f"{k}: {v}")
 
-                st.subheader("🪐 Gezegenler")
-                for k, v in planets.items():
-                    st.write(f"{k}: {v}")
+            st.subheader("📅 Günlük Yorum")
+            st.write(daily_comment(planets))
 
-                st.subheader("📅 Günlük Yorum")
-                st.write(daily_comment(planets))
-
-                st.subheader("🧠 AI Yorum")
-                st.write(ai_comment(planets))
+            st.subheader("🧠 AI Yorum")
+            st.write(ai_comment(planets))
